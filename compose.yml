@@ -5,8 +5,8 @@ services:
     restart: unless-stopped
     environment:
       CONTAINERS: 1   # inspect containers
-      POST: 0         # block all writes ...
-      ALLOW_RESTARTS: 1   # ... except restart/stop/kill (verify, see README)
+      POST: 1         # required: the proxy denies every non-GET request unless POST is on
+      ALLOW_RESTARTS: 1   # allows restart/stop/kill (needs POST: 1; see README for the trade-off)
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
     networks: [watchdog]

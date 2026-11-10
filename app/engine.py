@@ -83,6 +83,7 @@ class Engine:
     cfg: GroupConfig
     restart_times: deque = field(default_factory=deque)
     parent_ok_since: float | None = None
+    parent_started_seen: float | None = None
     bad_since: float | None = None
     settle_until: float = 0
     last_restart: float | None = None
@@ -127,6 +128,16 @@ class Engine:
 
         if self.parent_ok_since is None:
             self.parent_ok_since = now
+
+        # Gluetun restarted between two checks (never seen unhealthy): re-arm the grace.
+        if (
+            self.parent_started_seen is not None
+            and parent.started_at is not None
+            and parent.started_at != self.parent_started_seen
+        ):
+            self.parent_ok_since = now
+        if parent.started_at is not None:
+            self.parent_started_seen = parent.started_at
 
         # 2. Give the VPN time to settle after it came back.
         if now - self.parent_ok_since < cfg.parent_healthy_grace:

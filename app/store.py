@@ -29,8 +29,9 @@ class Store:
         return [dict(ts=r[0], grp=r[1], kind=r[2], detail=r[3]) for r in rows]
 
     def restart_times(self, grp: str, since: float) -> list[float]:
+        """Real restarts only: dry runs and failed attempts don't use the live budget."""
         rows = self.db.execute(
-            "SELECT ts FROM events WHERE grp=? AND kind IN ('restart','dry_run') AND ts>=?",
+            "SELECT ts FROM events WHERE grp=? AND kind='restart' AND ts>=?",
             (grp, since),
         ).fetchall()
         return [r[0] for r in rows]

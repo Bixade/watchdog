@@ -7,11 +7,11 @@ Small service that watches the Gluetun stack and restarts qBittorrent (and frien
 | Situation | Action |
 |---|---|
 | Gluetun down/unhealthy (kill switch working) | Nothing. qBittorrent staying idle is intended |
-| Gluetun just came back | Waits `parent_healthy_grace` seconds |
+| Gluetun just came back (also re-armed if its start time changes between two checks) | Waits `parent_healthy_grace` seconds |
 | Child started *before* Gluetun's current start (stale network namespace: "Up" but no connectivity) | Restarts the children |
 | qBittorrent WebUI unreachable or `connection_status=disconnected` for `bad_after` seconds | Restarts the children |
 | qBittorrent login fails (wrong password) | Nothing, shown as unknown |
-| Too many restarts (`max_restarts_per_hour`) | Gives up, tells you, stops looping |
+| Too many restarts (`max_restarts_per_hour`; only real restarts count after a process restart) | Gives up, tells you, stops looping |
 
 Starts in **dry run**: it only logs what it would do. Web page: `http://mediaserver:8099`. Events live in SQLite in `/appdata/watchdog`. Optional ntfy notifications via `NTFY_URL`.
 
@@ -37,11 +37,11 @@ Via the OMV compose plugin: paste `compose.yml`, put the env in the env box, and
 
 ## Unverified (test before trusting)
 
-- docker-socket-proxy: whether `ALLOW_RESTARTS: 1` with `POST: 0` permits `POST /containers/{id}/restart`. Test: with `dry_run: false` trigger the stale case and look for `restart_failed` in Events. If it is blocked, try `POST: 1` (the proxy still only exposes the `CONTAINERS` section).
+- docker-socket-proxy: verified on the real stack that `POST: 0` blocks restarts (its config denies every non-GET unless `POST` is on), so `POST: 1` is required. Trade-off: with `CONTAINERS: 1` + `POST: 1` the proxy also allows creating/deleting containers (path-prefix match), which is effectively root on the host if the watchdog were compromised. Mitigated by an isolated network, no published proxy port, and a UI with no write actions.
 - qBittorrent API: `connection_status` values and whether the WebUI answers while the VPN is down (here, unreachable counts as failing, but only after Gluetun has been healthy for the grace period).
 - Whether Gluetun's Docker health status is reliable on your setup (`docker inspect gluetun --format '{{.State.Health.Status}}'`).
 - Port 8099 free; `docker compose build` works on the server (only the unit tests were run, against mocks).
-- Forwarded port changes after a VPN reconnect are not handled yet (idea: Gluetun `VPN_PORT_FORWARDING_UP_COMMAND` to update qBittorrent).
+- Forwarded port after a VPN reconnect: handled by Gluetun's `VPN_PORT_FORWARDING_UP_COMMAND` (verified on ProtonVPN: it retries until qBittorrent is back and then sets the new port), not by the watchdog.
 
 ## Tests
 

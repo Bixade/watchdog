@@ -58,3 +58,18 @@ def test_runner_dry_run_vs_live(tmp_path):
         assert d.restarted == ([] if dry else ["qbittorrent"])
         kinds = [e["kind"] for e in st.recent()]
         assert ("dry_run" in kinds) == dry and ("restart" in kinds) == (not dry)
+
+
+def test_qbit_login_204_is_success():
+    def f(req):
+        if req.url.path.endswith("login"): return httpx.Response(204)
+        return httpx.Response(200, json={"connection_status": "connected"})
+    assert run(qb(f).run()).ok is True
+    def banned(req): return httpx.Response(403)
+    assert run(qb(banned).run()).ok is None
+
+
+def test_store_budget_counts_only_real_restarts(tmp_path):
+    st = Store(str(tmp_path / "b.db"))
+    st.add("g", "dry_run", "x", ts=100); st.add("g", "restart_failed", "x", ts=110); st.add("g", "restart", "x", ts=120)
+    assert st.restart_times("g", 0) == [120]

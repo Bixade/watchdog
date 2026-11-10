@@ -54,7 +54,7 @@ def test_unknown_check_never_restarts():
         assert e.evaluate(t, P(), {"qb": Q()}, {"qb": R(None, "login failed")}).decision is None
 
 def test_settle_cooldown_and_cap():
-    e = mk(); e.evaluate(0, P(), {"qb": Q()}, OK)
+    e = mk(); e.evaluate(0, P(2000), {"qb": Q(1000)}, OK)
     assert e.evaluate(100, P(2000), {"qb": Q(1000)}, OK).decision  # restart 1 (stale)
     assert e.evaluate(150, P(2000), {"qb": Q(1000)}, OK).status.state == "settling"
     assert e.evaluate(230, P(2000), {"qb": Q(1000)}, OK).status.state == "cooldown"
@@ -66,7 +66,7 @@ def test_settle_cooldown_and_cap():
 
 def test_preload_counts_toward_cap():
     e = mk(); e.preload_restarts([10, 20, 30])
-    e.evaluate(0, P(), {"qb": Q()}, OK)
+    e.evaluate(0, P(2000), {"qb": Q(1000)}, OK)
     r = e.evaluate(100, P(2000), {"qb": Q(1000)}, OK)
     assert r.status.state == "gave_up"
 
@@ -74,3 +74,13 @@ def test_stopped_child_is_not_restarted():
     e = mk(); e.evaluate(0, P(), {"qb": Q()}, OK)
     stopped = C("qb", True, False, None, 1000)
     assert e.evaluate(100, P(), {"qb": stopped}, {}).decision is None
+
+
+def test_grace_rearms_when_parent_restarts_between_checks():
+    e = mk(); e.evaluate(0, P(1000), {"qb": Q(1000)}, OK)
+    assert e.evaluate(100, P(1000), {"qb": Q(1000)}, OK).status.state == "ok"
+    # gluetun restarted (new StartedAt) but was never seen unhealthy
+    r = e.evaluate(130, P(1125), {"qb": Q(1000)}, OK)
+    assert r.status.state == "vpn_settling" and r.decision is None
+    r = e.evaluate(195, P(1125), {"qb": Q(1000)}, OK)
+    assert r.decision and "stale" in r.decision.reason
