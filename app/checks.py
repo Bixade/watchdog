@@ -31,8 +31,13 @@ class QbittorrentCheck:
             )
         except httpx.HTTPError as exc:
             return CheckResult(False, f"WebUI unreachable ({type(exc).__name__})")
-        if login.status_code != 200 or login.text.strip() != "Ok.":
-            return CheckResult(None, "login failed; check QBIT_USER/QBIT_PASS")
+        # Older qBittorrent: 200 "Ok." / 200 "Fails."; newer: 204 (no body) on success.
+        # With auth bypass (localhost/subnet whitelist) any credentials succeed.
+        login_ok = login.status_code == 204 or (
+            login.status_code == 200 and login.text.strip() == "Ok."
+        )
+        if not login_ok:
+            return CheckResult(None, f"login failed (HTTP {login.status_code}); check QBIT_USER/QBIT_PASS")
         try:
             r = await self.http.get(f"{self.url}/api/v2/transfer/info")
             r.raise_for_status()
