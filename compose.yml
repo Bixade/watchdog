@@ -1,0 +1,34 @@
+services:
+  watchdog-proxy:
+    image: tecnativa/docker-socket-proxy
+    container_name: watchdog-proxy
+    restart: unless-stopped
+    environment:
+      CONTAINERS: 1   # inspect containers
+      POST: 0         # block all writes ...
+      ALLOW_RESTARTS: 1   # ... except restart/stop/kill (verify, see README)
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks: [watchdog]
+
+  watchdog:
+    image: watchdog:local
+    build: .
+    container_name: watchdog
+    restart: unless-stopped
+    user: "1000:100"
+    depends_on: [watchdog-proxy]
+    env_file: .env
+    environment:
+      DOCKER_HOST: http://watchdog-proxy:2375
+      CONFIG_FILE: /config/config.yml
+    ports:
+      - "8099:8000"
+    volumes:
+      - /appdata/watchdog:/data
+      - /appdata/watchdog/config.yml:/config/config.yml:ro
+    mem_limit: 128m
+    networks: [watchdog]
+
+networks:
+  watchdog:

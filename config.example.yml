@@ -1,0 +1,19 @@
+# Start in dry_run: the watchdog only logs what it WOULD restart.
+# Set to false once the events page looks sensible for a few days.
+dry_run: true
+interval: 30          # seconds between checks
+db_path: /data/watchdog.db
+
+qbittorrent:
+  container: qbittorrent
+  url: http://gluetun:8080   # qBittorrent WebUI as seen from the watchdog's network; adjust
+
+groups:
+  - name: vpn-stack
+    parent: gluetun
+    children: [qbittorrent]   # add searxng etc. if they share gluetun's network
+    parent_healthy_grace: 60  # seconds gluetun must be healthy before judging children
+    bad_after: 180            # seconds a failing check must persist
+    settle: 120               # wait after a restart before judging again
+    cooldown: 300
+    max_restarts_per_hour: 3
